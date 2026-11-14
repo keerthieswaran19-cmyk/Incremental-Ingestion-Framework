@@ -96,6 +96,7 @@ Dead-Letter Queue (DLQ) for all malformed, schema-violating, or corrupted record
 | `raw_payload` | `TEXT` | `NO` | Verbatim corrupt or malformed payload. |
 | `error_code` | `TEXT` | `NO` | Standard error classification (e.g., `SCHEMA_VALIDATION_ERROR`, `NULL_KEY_ERROR`, `INVALID_TIMESTAMP`, `MALFORMED_JSON`). |
 | `error_message` | `TEXT` | `NO` | Detailed human-readable root-cause failure description. |
+| `occurrence_count` | `INTEGER` | `NO` | Number of times this identical content error has occurred. Default 1. |
 | `replayed` | `INTEGER` | `NO` | 0 = pending review, 1 = successfully replayed. Default 0. |
 | `run_id` | `TEXT` | `NO` | Execution run ID referencing `pipeline_runs(run_id)`. |
 | `created_at` | `TEXT` | `NO` | ISO-8601 timestamp when quarantined. |

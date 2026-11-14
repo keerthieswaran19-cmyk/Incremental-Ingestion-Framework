@@ -42,9 +42,12 @@ class Loader:
 
         insert_sql = """
         INSERT INTO quarantine (
-            quarantine_id, source_file, raw_payload, error_code, error_message, replayed, run_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?)
-        ON CONFLICT(quarantine_id) DO NOTHING;
+            quarantine_id, source_file, raw_payload, error_code, error_message, occurrence_count, replayed, run_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)
+        ON CONFLICT(quarantine_id) DO UPDATE SET
+            occurrence_count = quarantine.occurrence_count + 1,
+            run_id = excluded.run_id,
+            created_at = excluded.created_at;
         """
         params = [
             (

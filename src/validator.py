@@ -23,6 +23,7 @@ class QuarantineRecord(BaseModel):
     raw_payload: str
     error_code: str
     error_message: str
+    occurrence_count: int = 1
     run_id: str
     created_at: str
 
@@ -35,8 +36,11 @@ class Validator:
         self.source_file = source_file
 
     def _generate_quarantine_id(self, raw_payload: str, error_code: str) -> str:
-        """Generates a deterministic hash ID for the quarantine entry."""
-        hash_input = f"{self.run_id}:{self.source_file}:{error_code}:{raw_payload}"
+        """
+        Generates a deterministic, content-addressable hash ID for the quarantine entry.
+        Excludes run_id to ensure strict idempotency across reruns and deduplicate identical errors.
+        """
+        hash_input = f"{self.source_file}:{error_code}:{raw_payload}"
         return hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
 
     def _parse_iso_timestamp(self, ts_str: Any) -> Optional[datetime]:

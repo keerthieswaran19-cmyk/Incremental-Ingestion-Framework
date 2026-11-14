@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS quarantine (
     raw_payload TEXT NOT NULL,
     error_code TEXT NOT NULL,
     error_message TEXT NOT NULL,
+    occurrence_count INTEGER NOT NULL DEFAULT 1,
     replayed INTEGER NOT NULL DEFAULT 0,
     run_id TEXT NOT NULL,
     created_at TEXT NOT NULL

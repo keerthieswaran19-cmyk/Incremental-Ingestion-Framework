@@ -38,6 +38,7 @@ class QuarantineItem(BaseModel):
     raw_payload: str
     error_code: str
     error_message: str
+    occurrence_count: int = 1
     replayed: int
     run_id: str
     created_at: str
