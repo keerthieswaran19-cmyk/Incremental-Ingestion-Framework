@@ -1,0 +1,45 @@
+{
+  "benchmark_timestamp": "2026-11-14T09:09:14Z",
+  "record_count": 100000,
+  "seed": 42,
+  "duration_seconds": 5.494,
+  "duration_ms": 4797.22,
+  "records_per_second": 18202.93,
+  "metrics": {
+    "run_id": "RUN_20261114_090908_3A7DB2",
+    "status": "SUCCESS",
+    "source_file": "benchmark_100000_seed42.json",
+    "input_count": 100000,
+    "inserted_count": 41378,
+    "updated_count": 0,
+    "deleted_count": 2416,
+    "quarantined_count": 8083,
+    "duplicate_count": 48123,
+    "late_arriving_count": 0,
+    "duration_ms": 4797.22,
+    "records_per_sec": 20845.41,
+    "watermark_start": "1970-01-01T00:00:00+00:00",
+    "watermark_end": "2026-12-08T15:01:43+00:00"
+  },
+  "reconciliation": {
+    "run_id": "RUN_20261114_090908_3A7DB2",
+    "status": "BALANCED",
+    "conservation_equation": "input_count == (inserted + updated + deleted + quarantined + duplicate)",
+    "metrics": {
+      "input_count": 100000,
+      "inserted_count": 41378,
+      "updated_count": 0,
+      "deleted_count": 2416,
+      "quarantined_count": 8083,
+      "duplicate_count": 48123,
+      "sum_of_components": 100000,
+      "discrepancy": 0
+    },
+    "is_mathematically_sound": true
+  },
+  "target_table_statistics": {
+    "active_records": 41378,
+    "tombstoned_records": 2416,
+    "total_target_records": 43794
+  }
+}

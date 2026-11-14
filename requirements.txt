@@ -1,0 +1,7 @@
+# Core dependencies for Incremental Ingestion Framework
+pydantic>=2.0.0
+pytest>=8.0.0
+
+# API and Web Observability Service
+fastapi>=0.110.0
+uvicorn>=0.28.0

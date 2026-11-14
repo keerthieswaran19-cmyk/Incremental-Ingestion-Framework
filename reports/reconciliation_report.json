@@ -1,0 +1,41 @@
+{
+  "summary": "Full Ingestion Framework Reconciliation Report",
+  "table_counts": {
+    "source_events": 94449,
+    "target_records": 43794,
+    "event_history": 43794,
+    "quarantine": 6309,
+    "pipeline_runs": 1,
+    "watermark_state": 1,
+    "file_registry": 1
+  },
+  "target_statistics": {
+    "active_records": 41378,
+    "tombstoned_records": 2416,
+    "total_target_records": 43794
+  },
+  "watermarks": [
+    {
+      "high_watermark": "2026-12-08T15:01:43+00:00",
+      "entity_name": "CUSTOMER"
+    }
+  ],
+  "recent_runs_reconciliation": [
+    {
+      "run_id": "RUN_20261114_090908_3A7DB2",
+      "status": "BALANCED",
+      "conservation_equation": "input_count == (inserted + updated + deleted + quarantined + duplicate)",
+      "metrics": {
+        "input_count": 100000,
+        "inserted_count": 41378,
+        "updated_count": 0,
+        "deleted_count": 2416,
+        "quarantined_count": 8083,
+        "duplicate_count": 48123,
+        "sum_of_components": 100000,
+        "discrepancy": 0
+      },
+      "is_mathematically_sound": true
+    }
+  ]
+}

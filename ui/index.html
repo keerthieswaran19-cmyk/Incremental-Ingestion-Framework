@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incremental Ingestion Operations Cockpit</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="cockpit-container">
+    <!-- Header -->
+    <header>
+      <div class="logo-area">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1>Incremental Ingestion Operations Cockpit</h1>
+          <div class="subtitle">Enterprise Data Engineering • Bi-Temporal CDC • WAL Mode Engine</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <div class="status-badge">
+          <div class="status-pulse"></div>
+          <span id="engine-status">ONLINE (SQLite WAL)</span>
+        </div>
+        <button class="btn-secondary" onclick="loadDashboard()">🔄 Refresh</button>
+      </div>
+    </header>
+
+    <!-- Top KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-title">Active Target Snapshot</div>
+        <div class="kpi-val" id="kpi-active-targets">--</div>
+        <div class="kpi-sub" id="kpi-tombstones">Tombstones: --</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Source Events Ingested</div>
+        <div class="kpi-val" id="kpi-source-events">--</div>
+        <div class="kpi-sub">Forensic Audit Log</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Quarantined (DLQ)</div>
+        <div class="kpi-val" style="color: var(--accent-rose);" id="kpi-quarantine">--</div>
+        <div class="kpi-sub">Zero Silent Loss</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">High Watermark</div>
+        <div class="kpi-val" style="font-size: 16px; word-break: break-all;" id="kpi-watermark">--</div>
+        <div class="kpi-sub">Entity: CUSTOMER</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Peak Ingestion Speed</div>
+        <div class="kpi-val" style="color: var(--accent-emerald);" id="kpi-peak-speed">--</div>
+        <div class="kpi-sub" id="kpi-avg-speed">Avg: -- rec/s</div>
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <label style="font-size: 13px; color: var(--text-muted); font-weight: 600;">Action Runner:</label>
+        <select id="run-source-select" style="background: #1f2937; color: #fff; border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 6px; font-size: 13px;">
+          <option value="data/source/sample_data.json">Sample Dataset (data/source/sample_data.json)</option>
+        </select>
+        <label style="font-size: 13px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <input type="checkbox" id="chk-force-reprocess"> Force Reprocess
+        </label>
+        <label style="font-size: 13px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <input type="checkbox" id="chk-incremental" checked> Incremental Filter
+        </label>
+      </div>
+
+      <div class="btn-group">
+        <button onclick="triggerIngestion()">🚀 Run Ingestion Job</button>
+        <button class="btn-secondary" onclick="openDocs()">📖 API Docs (Swagger)</button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('runs')">Pipeline Execution Runs</button>
+      <button class="tab-btn" onclick="switchTab('quarantine')">Dead-Letter Queue (Quarantine)</button>
+      <button class="tab-btn" onclick="switchTab('reconcile')">Conservation Reconciliation</button>
+      <button class="tab-btn" onclick="switchTab('watermarks')">Watermark Registry</button>
+    </div>
+
+    <!-- Panel Content -->
+    <div class="panel">
+      <!-- Runs View -->
+      <div id="tab-runs">
+        <h3 style="margin-bottom: 16px; font-size: 16px;">Audit Execution Runs</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Run ID</th>
+              <th>Start Time</th>
+              <th>Status</th>
+              <th>Input</th>
+              <th>Inserts</th>
+              <th>Updates</th>
+              <th>Deletes</th>
+              <th>Quarantined</th>
+              <th>Duplicates</th>
+              <th>Duration</th>
+              <th>Speed</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="runs-tbody">
+            <tr><td colspan="12" style="text-align: center;">Loading runs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Quarantine View -->
+      <div id="tab-quarantine" style="display: none;">
+        <h3 style="margin-bottom: 16px; font-size: 16px;">Dead-Letter Queue (Quarantine)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Quarantine ID</th>
+              <th>Error Code</th>
+              <th>Reason</th>
+              <th>Source File</th>
+              <th>Run ID</th>
+              <th>Created At</th>
+              <th>Payload</th>
+            </tr>
+          </thead>
+          <tbody id="quarantine-tbody">
+            <tr><td colspan="7" style="text-align: center;">Loading quarantine...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Reconciliation View -->
+      <div id="tab-reconcile" style="display: none;">
+        <h3 style="margin-bottom: 16px; font-size: 16px;">Conservation of Data Equation</h3>
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">
+          Mathematical Invariant: <code>Input Count ≡ Inserts + Updates + Deletes + Quarantined + Duplicates</code>
+        </p>
+        <div id="reconcile-content">Loading reconciliation metrics...</div>
+      </div>
+
+      <!-- Watermarks View -->
+      <div id="tab-watermarks" style="display: none;">
+        <h3 style="margin-bottom: 16px; font-size: 16px;">High Watermark State Store</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Entity Name</th>
+              <th>High Watermark Timestamp</th>
+              <th>Last Updated At</th>
+              <th>Last Run ID</th>
+            </tr>
+          </thead>
+          <tbody id="watermarks-tbody">
+            <tr><td colspan="4" style="text-align: center;">Loading watermarks...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
