@@ -73,7 +73,7 @@ class PipelineRunner:
                         input_count, inserted_count, updated_count, deleted_count,
                         quarantined_count, duplicate_count, duration_ms, records_per_sec,
                         error_message
-                    ) VALUES (?, ?, ?, 'SKIPPED_ALREADY_PROCESSED', ?, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 'File already processed')
+                    ) VALUES (?, ?, ?, 'SKIPPED_ALREADY_PROCESSED', ?, 0, 0, 0, 0, 0, 0, 0.0, 0.0, NULL)
                     """,
                     (run_id, start_time.isoformat(), datetime.now(timezone.utc).isoformat(), source_path.name),
                 )

@@ -60,10 +60,11 @@ echo   [3] Run 100,000+ Records Benchmark ^& Generate Audit Reports
 echo   [4] Initialize / Reset SQLite Database (Clean State)
 echo   [5] Generate Synthetic Sample Data (100 dirty records)
 echo   [6] Full End-to-End Automated Demonstration (Init + Test + Bench + UI)
-echo   [7] Exit
+echo   [7] Stop Running UI Server (Release Port 8000)
+echo   [8] Exit
 echo.
 echo ==============================================================================
-set /p choice="Enter your choice [1-7]: "
+set /p choice="Enter your choice [1-8]: "
 
 if "%choice%"=="1" goto :START_UI
 if "%choice%"=="2" goto :RUN_TESTS
@@ -71,9 +72,10 @@ if "%choice%"=="3" goto :RUN_BENCHMARK
 if "%choice%"=="4" goto :INIT_DB
 if "%choice%"=="5" goto :GEN_DATA
 if "%choice%"=="6" goto :RUN_ALL
-if "%choice%"=="7" goto :EXIT
+if "%choice%"=="7" goto :STOP_UI
+if "%choice%"=="8" goto :EXIT
 
-echo [ERROR] Invalid choice. Please select 1 through 7.
+echo [ERROR] Invalid choice. Please select 1 through 8.
 timeout /t 2 >nul
 goto :PYTHON_FOUND
 
@@ -151,6 +153,14 @@ echo All steps completed successfully! Launching UI...
 echo ==============================================================================
 start http://127.0.0.1:8000
 "!PYTHON_CMD!" -m uvicorn api.app:app --host 127.0.0.1 --port 8000
+goto :PYTHON_FOUND
+
+:STOP_UI
+cls
+echo ==============================================================================
+echo Stopping any active process on port 8000...
+echo ==============================================================================
+call "%~dp0stop_ui.bat"
 goto :PYTHON_FOUND
 
 :EXIT

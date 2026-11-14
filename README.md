@@ -226,13 +226,20 @@ python -c "from src.pipeline import PipelineRunner; from pathlib import Path; ru
 ### 4. Launch REST API & Operations Cockpit UI
 Start the FastAPI server and open the web dashboard:
 ```powershell
+# Using the dedicated launcher batch file:
+start_ui.bat
+
+# Or stop the server to free port 8000 at any time:
+stop_ui.bat
+
+# Or via Python directly:
 python -m uvicorn api.app:app --host 127.0.0.1 --port 8000
 ```
 - **Operations Cockpit UI**: Open your browser to `http://127.0.0.1:8000`
 - **Swagger OpenAPI Docs**: Open your browser to `http://127.0.0.1:8000/docs`
 
 ### 5. Run Automated Test Suite
-Run the 16 comprehensive pytest scenarios covering happy path, late arrivals, tombstones, malformed JSON, rollback recovery, and idempotency:
+Run the 21 comprehensive pytest scenarios covering happy path, late arrivals, tombstones, malformed JSON, rollback recovery, schema drift, foreign key validation, DLQ replay, and idempotency:
 ```powershell
 python -m pytest tests/ -v
 ```

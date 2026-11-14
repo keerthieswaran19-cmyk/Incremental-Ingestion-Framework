@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api.schemas import DLQReplayRequest, IngestionRequest, QuarantineItem, RunSummaryResponse, WatermarkItem
 from src.analytics import ReconciliationEngine
-from src.config import DB_PATH, PROJECT_ROOT, SOURCE_DATA_DIR
+from src.config import DB_PATH, GENERATED_DATA_DIR, PROJECT_ROOT, SOURCE_DATA_DIR
 from src.database import get_connection
 from src.pipeline import PipelineRunner
 from src.recovery import RecoveryManager
@@ -52,9 +52,15 @@ def trigger_ingestion(req: IngestionRequest):
     # Resolve file path
     target_file = Path(req.source_file)
     if not target_file.is_absolute():
-        target_file = SOURCE_DATA_DIR / req.source_file
-        if not target_file.exists():
-            target_file = PROJECT_ROOT / req.source_file
+        candidates = [
+            SOURCE_DATA_DIR / req.source_file,
+            GENERATED_DATA_DIR / req.source_file,
+            PROJECT_ROOT / req.source_file,
+        ]
+        for cand in candidates:
+            if cand.exists():
+                target_file = cand
+                break
 
     if not target_file.exists():
         raise HTTPException(status_code=404, detail=f"Source file not found: {req.source_file}")

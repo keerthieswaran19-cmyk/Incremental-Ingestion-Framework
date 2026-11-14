@@ -71,26 +71,28 @@ function showToast({ type = 'info', title, message, details = null, duration = 4
 
   let detailsHtml = '';
   if (details) {
-    detailsHtml = `<div class="toast-details-code">${escapeHtml(details)}</div>`;
+    detailsHtml = `<div class="toast-details">${escapeHtml(details)}</div>`;
   }
 
   card.innerHTML = `
-    <div class="toast-icon-wrap">
-      <i data-lucide="${iconName}"></i>
+    <div class="toast-inner">
+      <div class="toast-icon-wrap">
+        <i data-lucide="${iconName}"></i>
+      </div>
+      <div class="toast-body">
+        <div class="toast-title">${escapeHtml(title || 'Notification')}</div>
+        <div class="toast-message">${escapeHtml(message || '')}</div>
+        ${detailsHtml}
+      </div>
+      <button class="toast-close" aria-label="Close">&times;</button>
     </div>
-    <div class="toast-body">
-      <div class="toast-title">${escapeHtml(title || 'Notification')}</div>
-      <div class="toast-message">${escapeHtml(message || '')}</div>
-      ${detailsHtml}
-    </div>
-    <button class="toast-close-btn" aria-label="Close">&times;</button>
     <div class="toast-progress">
       <div class="toast-progress-bar" style="animation-duration: ${duration}ms;"></div>
     </div>
   `;
 
   // Close on button click
-  const closeBtn = card.querySelector('.toast-close-btn');
+  const closeBtn = card.querySelector('.toast-close');
   closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     dismissToast(card);
@@ -113,12 +115,12 @@ function dismissToast(card) {
   if (card._isDismissed) return;
   card._isDismissed = true;
   clearTimeout(card._dismissTimer);
-  card.classList.add('toast-dismissing');
+  card.classList.add('toast-hiding');
   setTimeout(() => {
     if (card.parentNode) {
       card.parentNode.removeChild(card);
     }
-  }, 250);
+  }, 220);
 }
 
 function escapeHtml(str) {
@@ -765,17 +767,19 @@ async function runIngestion() {
     await loadAllData();
     navigate(currentView);
     if (res.status === 'SUCCESS') {
+      const durSec = res.duration_ms ? (res.duration_ms / 1000).toFixed(2) : '0.00';
+      const speed = res.records_per_sec ? Math.round(res.records_per_sec).toLocaleString() : '0';
       showToast({
         type: 'success',
         title: 'Ingestion Completed',
-        message: `Processed ${res.records_read || 0} records in ${res.duration_seconds || 0}s (${res.records_per_second || 0} r/s).`,
+        message: `Processed ${(res.input_count || 0).toLocaleString()} records in ${durSec}s (${speed} rec/s).`,
         details: `Run ID: ${res.run_id}`
       });
-    } else if (res.status === 'SKIPPED') {
+    } else if (res.status && res.status.includes('SKIPPED')) {
       showToast({
         type: 'warning',
-        title: 'Ingestion Skipped',
-        message: res.message || 'File hash matches previous run. Use Force Reprocess to override.',
+        title: 'File Already Ingested',
+        message: 'This file has already been ingested. To reprocess it, check the "Force" box next to Ingest.',
         details: `Source: ${file}`
       });
     } else {
