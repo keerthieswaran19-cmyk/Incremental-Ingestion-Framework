@@ -165,3 +165,47 @@ def get_system_overview():
         },
         "watermarks": watermarks,
     }
+
+
+@app.get("/api/target-records")
+def get_target_records(limit: int = 50, search: Optional[str] = None):
+    """Returns curated target records for Event Explorer."""
+    conn = get_connection(DB_PATH)
+    cursor = conn.cursor()
+    if search:
+        cursor.execute(
+            "SELECT * FROM target_records WHERE natural_key LIKE ? OR entity_type LIKE ? ORDER BY last_updated_at DESC LIMIT ?",
+            (f"%{search}%", f"%{search}%", limit)
+        )
+    else:
+        cursor.execute("SELECT * FROM target_records ORDER BY last_updated_at DESC LIMIT ?", (limit,))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+@app.get("/api/events")
+def get_event_history(limit: int = 50, natural_key: Optional[str] = None):
+    """Returns immutable CDC event history entries."""
+    conn = get_connection(DB_PATH)
+    cursor = conn.cursor()
+    if natural_key:
+        cursor.execute(
+            "SELECT * FROM event_history WHERE natural_key = ? ORDER BY event_timestamp DESC LIMIT ?",
+            (natural_key, limit)
+        )
+    else:
+        cursor.execute("SELECT * FROM event_history ORDER BY created_at DESC LIMIT ?", (limit,))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+@app.post("/api/generate-sample")
+def api_generate_sample(count: int = 100):
+    """Generates reproducible sample data on the fly."""
+    from scripts.generate_data import generate_dataset
+    from src.config import SAMPLE_DATA_FILE
+    out_file = generate_dataset(count=count, output_path=SAMPLE_DATA_FILE, include_anomalies=True)
+    return {"status": "SUCCESS", "records_generated": count, "file": str(out_file.name)}
+
