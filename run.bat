@@ -55,7 +55,7 @@ echo.
 echo Select an option:
 echo.
 echo   [1] Start REST API ^& Operations Cockpit UI (Opens in Browser)
-echo   [2] Run Automated Test Suite (16 pytest scenarios)
+echo   [2] Run Automated Test Suite (17 pytest scenarios)
 echo   [3] Run 100,000+ Records Benchmark ^& Generate Audit Reports
 echo   [4] Initialize / Reset SQLite Database (Clean State)
 echo   [5] Generate Synthetic Sample Data (100 dirty records)
@@ -92,7 +92,7 @@ goto :PYTHON_FOUND
 :RUN_TESTS
 cls
 echo ==============================================================================
-echo Running 16 Automated Pytest Scenarios...
+echo Running 17 Automated Pytest Scenarios...
 echo ==============================================================================
 "!PYTHON_CMD!" -m pytest tests/ -v
 echo.

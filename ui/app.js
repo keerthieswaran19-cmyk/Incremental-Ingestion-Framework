@@ -42,6 +42,156 @@ function toggleTheme() {
   const current = getActiveTheme();
   const next = current === 'light' ? 'dark' : 'light';
   setTheme(next);
+  showToast({
+    type: 'info',
+    title: 'Theme Switched',
+    message: `Active color mode set to ${next.toUpperCase()} (Cloud & Sage palette).`,
+    duration: 3000
+  });
+}
+
+// ==========================================================================
+// TOAST NOTIFICATION ENGINE
+// ==========================================================================
+
+function showToast({ type = 'info', title, message, details = null, duration = 4500 }) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const card = document.createElement('div');
+  card.className = `toast-card toast-${type}`;
+
+  const iconNameMap = {
+    success: 'check-circle-2',
+    error: 'alert-circle',
+    warning: 'alert-triangle',
+    info: 'info'
+  };
+  const iconName = iconNameMap[type] || 'info';
+
+  let detailsHtml = '';
+  if (details) {
+    detailsHtml = `<div class="toast-details-code">${escapeHtml(details)}</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="toast-icon-wrap">
+      <i data-lucide="${iconName}"></i>
+    </div>
+    <div class="toast-body">
+      <div class="toast-title">${escapeHtml(title || 'Notification')}</div>
+      <div class="toast-message">${escapeHtml(message || '')}</div>
+      ${detailsHtml}
+    </div>
+    <button class="toast-close-btn" aria-label="Close">&times;</button>
+    <div class="toast-progress">
+      <div class="toast-progress-bar" style="animation-duration: ${duration}ms;"></div>
+    </div>
+  `;
+
+  // Close on button click
+  const closeBtn = card.querySelector('.toast-close-btn');
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dismissToast(card);
+  });
+
+  container.appendChild(card);
+  if (window.lucide) {
+    lucide.createIcons({ root: card });
+  }
+
+  // Auto dismiss timer
+  const timer = setTimeout(() => {
+    dismissToast(card);
+  }, duration);
+
+  card._dismissTimer = timer;
+}
+
+function dismissToast(card) {
+  if (card._isDismissed) return;
+  card._isDismissed = true;
+  clearTimeout(card._dismissTimer);
+  card.classList.add('toast-dismissing');
+  setTimeout(() => {
+    if (card.parentNode) {
+      card.parentNode.removeChild(card);
+    }
+  }, 250);
+}
+
+function escapeHtml(str) {
+  if (typeof str !== 'string') return String(str || '');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ==========================================================================
+// RECONCILIATION MODAL
+// ==========================================================================
+
+function openReconModal(runId, res) {
+  const modal = document.getElementById('recon-modal');
+  const runIdEl = document.getElementById('recon-modal-run-id');
+  const bodyEl = document.getElementById('recon-modal-body');
+  if (!modal || !bodyEl) return;
+
+  runIdEl.innerText = `Run ID: ${runId}`;
+
+  const isSound = res && res.is_mathematically_sound;
+  const statusBadge = isSound 
+    ? `<span class="badge badge-success" style="font-size: 13px; padding: 4px 10px;">100% CONSERVED (SOUND)</span>`
+    : `<span class="badge badge-error" style="font-size: 13px; padding: 4px 10px;">DISCREPANCY DETECTED</span>`;
+
+  const m = (res && res.metrics) || {};
+  bodyEl.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <div style="font-size: 14px; color: var(--text-secondary);">Mathematical Integrity Verification:</div>
+      ${statusBadge}
+    </div>
+    <div style="background-color: var(--bg-surface-secondary); border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px solid var(--border-color);">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+        <div style="color: var(--text-secondary);">Total Source Input:</div>
+        <div style="font-weight: 700; text-align: right; font-family: monospace;">${(m.input_count || 0).toLocaleString()}</div>
+
+        <div style="color: var(--text-secondary);">Target Inserts:</div>
+        <div style="font-weight: 600; text-align: right; color: var(--color-success); font-family: monospace;">+ ${(m.inserted_count || 0).toLocaleString()}</div>
+
+        <div style="color: var(--text-secondary);">Target Updates:</div>
+        <div style="font-weight: 600; text-align: right; color: var(--accent-primary); font-family: monospace;">+ ${(m.updated_count || 0).toLocaleString()}</div>
+
+        <div style="color: var(--text-secondary);">Target Deletes (Tombstones):</div>
+        <div style="font-weight: 600; text-align: right; color: var(--text-secondary); font-family: monospace;">+ ${(m.deleted_count || 0).toLocaleString()}</div>
+
+        <div style="color: var(--text-secondary);">DLQ Quarantine Rejects:</div>
+        <div style="font-weight: 600; text-align: right; color: var(--color-error); font-family: monospace;">+ ${(m.quarantined_count || 0).toLocaleString()}</div>
+
+        <div style="color: var(--text-secondary);">In-Batch & Prior Duplicates:</div>
+        <div style="font-weight: 600; text-align: right; color: var(--color-warning); font-family: monospace;">+ ${(m.duplicate_count || 0).toLocaleString()}</div>
+      </div>
+      <div style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; font-size: 13px; font-weight: 700;">
+        <span>Conservation Equation Delta:</span>
+        <span style="color: ${m.discrepancy === 0 ? 'var(--color-success)' : 'var(--color-error)'}; font-family: monospace;">
+          ${m.discrepancy === 0 ? '0 (Perfect Balance)' : m.discrepancy}
+        </span>
+      </div>
+    </div>
+    <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+      Formula Verified: <code>Input (${m.input_count || 0}) == Inserts (${m.inserted_count || 0}) + Updates (${m.updated_count || 0}) + Deletes (${m.deleted_count || 0}) + DLQ (${m.quarantined_count || 0}) + Duplicates (${m.duplicate_count || 0})</code>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+}
+
+function closeReconModal(event) {
+  const modal = document.getElementById('recon-modal');
+  if (modal) modal.style.display = 'none';
 }
 
 // ==========================================================================
@@ -127,6 +277,12 @@ function navigate(viewName) {
 function refreshCurrentView() {
   loadAllData().then(() => {
     navigate(currentView);
+    showToast({
+      type: 'info',
+      title: 'Telemetry Refreshed',
+      message: 'All system metrics, executions, DLQ records, and watermarks updated.',
+      duration: 3000
+    });
   });
 }
 
@@ -608,32 +764,75 @@ async function runIngestion() {
   if (res) {
     await loadAllData();
     navigate(currentView);
+    if (res.status === 'SUCCESS') {
+      showToast({
+        type: 'success',
+        title: 'Ingestion Completed',
+        message: `Processed ${res.records_read || 0} records in ${res.duration_seconds || 0}s (${res.records_per_second || 0} r/s).`,
+        details: `Run ID: ${res.run_id}`
+      });
+    } else if (res.status === 'SKIPPED') {
+      showToast({
+        type: 'warning',
+        title: 'Ingestion Skipped',
+        message: res.message || 'File hash matches previous run. Use Force Reprocess to override.',
+        details: `Source: ${file}`
+      });
+    } else {
+      showToast({
+        type: 'error',
+        title: 'Ingestion Failed',
+        message: res.error_message || 'Pipeline encountered a failure during transaction.',
+        details: `Run ID: ${res.run_id || 'N/A'}`
+      });
+    }
+  } else {
+    showToast({
+      type: 'error',
+      title: 'API Request Error',
+      message: 'Unable to connect to ingestion endpoint. Check backend status.'
+    });
   }
 }
 
 async function generateSample() {
   const res = await apiPost('/api/generate-sample?count=100', {});
   if (res) {
-    alert("Generated fresh 100 dirty records into data/source/sample_data.json!");
+    showToast({
+      type: 'success',
+      title: 'Records Generated Successfully',
+      message: '100 fresh dirty records have been generated successfully.',
+      details: 'data/source/sample_data.json'
+    });
     await loadAllData();
     navigate(currentView);
+  } else {
+    showToast({
+      type: 'error',
+      title: 'Generation Failed',
+      message: 'Could not generate synthetic sample data.'
+    });
   }
 }
 
 async function verifyRunReconciliation(runId) {
   const res = await apiGet(`/api/runs/${runId}/reconcile`);
   if (res) {
-    alert(
-      `Conservation Balance for ${runId}:\n\n` +
-      `• Audit Soundness: ${res.is_mathematically_sound ? "100% BALANCED" : "DISCREPANCY"}\n` +
-      `• Total Input: ${res.metrics.input_count}\n` +
-      `• Inserts: ${res.metrics.inserted_count}\n` +
-      `• Updates: ${res.metrics.updated_count}\n` +
-      `• Deletes: ${res.metrics.deleted_count}\n` +
-      `• DLQ Rejects: ${res.metrics.quarantined_count}\n` +
-      `• Duplicates: ${res.metrics.duplicate_count}\n` +
-      `• Mathematical Discrepancy: ${res.metrics.discrepancy}`
-    );
+    openReconModal(runId, res);
+    showToast({
+      type: 'info',
+      title: 'Conservation Verified',
+      message: res.is_mathematically_sound 
+        ? 'Input matches Inserts + Updates + Deletes + DLQ + Duplicates exactly.' 
+        : 'Conservation discrepancy flagged in run balance.',
+      details: `Run ID: ${runId}`
+    });
+  } else {
+    showToast({
+      type: 'error',
+      title: 'Verification Failed',
+      message: `Failed to retrieve reconciliation data for ${runId}.`
+    });
   }
 }
 
@@ -662,7 +861,12 @@ function closeDrawer(event) {
 function copyDrawerJSON() {
   const text = document.getElementById('drawer-json').innerText;
   navigator.clipboard.writeText(text);
-  alert("JSON payload copied to clipboard!");
+  showToast({
+    type: 'info',
+    title: 'Payload Copied',
+    message: 'Verbatim JSON payload copied to clipboard.',
+    duration: 3000
+  });
 }
 
 function getStatusBadge(status) {

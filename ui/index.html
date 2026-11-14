@@ -550,6 +550,28 @@
     </div>
   </div>
 
+  <!-- Centered In-App Reconciliation Audit Modal -->
+  <div class="modal-backdrop-center" id="recon-modal" onclick="closeReconModal(event)">
+    <div class="modal-dialog-box" onclick="event.stopPropagation()">
+      <div class="modal-dialog-header">
+        <div>
+          <div class="modal-dialog-title">Conservation Balance Audit</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" id="recon-modal-run-id">--</div>
+        </div>
+        <button class="drawer-close-btn" onclick="closeReconModal()">&times;</button>
+      </div>
+      <div class="modal-dialog-body" id="recon-modal-body">
+        <!-- Injected via JavaScript -->
+      </div>
+      <div class="modal-dialog-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeReconModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reusable Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>
