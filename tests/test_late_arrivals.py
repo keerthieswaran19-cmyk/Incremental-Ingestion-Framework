@@ -58,3 +58,37 @@ def test_late_arriving_record_preserves_target_state(runner, create_test_file, t
     assert history[1]["event_timestamp"] == "2026-11-01T08:00:00+00:00"
 
     conn.close()
+
+
+def test_late_arrival_with_lookback_window(runner, create_test_file, temp_db_path):
+    """
+    Verifies that with incremental=True:
+    1. A late arrival within the lookback window passes the watermark gate.
+    2. Target state is protected against regression.
+    3. Event history records the out-of-order event.
+    """
+    # 1. Advance watermark to 2026-11-05T12:00:00Z
+    initial = [
+        {"natural_key": "CUST_LB", "name": "Current State", "updated_at": "2026-11-05T12:00:00Z", "amount": 500.0}
+    ]
+    runner.run(create_test_file(initial, "lb_init.json"))
+
+    # 2. Ingest late-arriving record with incremental=True and lookback_hours=72 (3 days)
+    # Event timestamp is 2026-11-04T10:00:00Z (26 hours prior to current watermark)
+    late_batch = [
+        {"natural_key": "CUST_LB", "name": "Older Late State", "updated_at": "2026-11-04T10:00:00Z", "amount": 100.0}
+    ]
+    res = runner.run(create_test_file(late_batch, "lb_late.json"), incremental=True, lookback_hours=72)
+
+    assert res["status"] == "SUCCESS"
+    assert res["late_arriving_count"] == 1
+
+    # Verify target state was NOT regressed
+    conn = sqlite3.connect(str(temp_db_path))
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT payload, last_updated_at FROM target_records WHERE natural_key = 'CUST_LB'")
+    target = cursor.fetchone()
+    assert '"amount": 500.0' in target["payload"]
+    assert target["last_updated_at"] == "2026-11-05T12:00:00+00:00"
+    conn.close()

@@ -8,11 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.schemas import IngestionRequest, QuarantineItem, RunSummaryResponse, WatermarkItem
+from api.schemas import DLQReplayRequest, IngestionRequest, QuarantineItem, RunSummaryResponse, WatermarkItem
 from src.analytics import ReconciliationEngine
 from src.config import DB_PATH, PROJECT_ROOT, SOURCE_DATA_DIR
 from src.database import get_connection
 from src.pipeline import PipelineRunner
+from src.recovery import RecoveryManager
 
 app = FastAPI(
     title="Incremental Ingestion Engine API",
@@ -116,6 +117,22 @@ def get_quarantine_records(
     rows = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return rows
+
+
+@app.post("/api/quarantine/{quarantine_id}/replay", response_model=Dict[str, Any])
+def replay_quarantine_record_api(quarantine_id: str, req: Optional[DLQReplayRequest] = None):
+    """Safely and idempotently replays a quarantined record into the target database."""
+    conn = get_connection(DB_PATH)
+    try:
+        corrected = req.corrected_payload if req else None
+        res = RecoveryManager.replay_quarantine_record(conn, quarantine_id, corrected)
+        if res.get("status") == "NOT_FOUND":
+            raise HTTPException(status_code=404, detail=res.get("message", "Not found"))
+        elif res.get("status") == "VALIDATION_FAILED":
+            raise HTTPException(status_code=422, detail=res)
+        return res
+    finally:
+        conn.close()
 
 
 @app.get("/api/watermarks", response_model=List[WatermarkItem])

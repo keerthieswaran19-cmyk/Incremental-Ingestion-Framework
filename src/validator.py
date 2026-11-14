@@ -2,9 +2,70 @@
 
 import hashlib
 import json
+import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field, ValidationError
+
+logger = logging.getLogger(__name__)
+
+
+class SchemaRegistry:
+    """Lightweight schema registry defining canonical attributes and validating schema drift."""
+
+    DEFAULT_SCHEMAS: Dict[str, Dict[str, Any]] = {
+        "CUSTOMER": {
+            "natural_key": str,
+            "entity_type": str,
+            "name": str,
+            "email": str,
+            "updated_at": str,
+            "operation_type": str,
+            "account_id": str,
+            "tier": str,
+            "amount": (int, float),
+            "description": str,
+            "is_late": bool,
+        }
+    }
+
+    def __init__(self, custom_schemas: Optional[Dict[str, Dict[str, Any]]] = None):
+        self.schemas = dict(self.DEFAULT_SCHEMAS)
+        if custom_schemas:
+            self.schemas.update(custom_schemas)
+
+    def detect_drift(self, entity_type: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Detects novel unexpected fields and datatype mutations.
+        Returns a list of schema drift violation descriptions.
+        """
+        drifts = []
+        expected = self.schemas.get(entity_type.upper())
+        if not expected:
+            return drifts
+
+        for key, val in payload.items():
+            if key.startswith("_"):
+                continue
+            if key not in expected:
+                drifts.append({
+                    "drift_type": "UNEXPECTED_FIELD",
+                    "field": key,
+                    "observed_type": type(val).__name__,
+                    "value_preview": str(val)[:50],
+                })
+            else:
+                expected_type = expected[key]
+                if val is not None and not isinstance(val, expected_type):
+                    exp_name = expected_type.__name__ if hasattr(expected_type, "__name__") else str(expected_type)
+                    drifts.append({
+                        "drift_type": "DATATYPE_MUTATION",
+                        "field": key,
+                        "expected_type": exp_name,
+                        "observed_type": type(val).__name__,
+                        "value_preview": str(val)[:50],
+                    })
+        return drifts
 
 
 class ValidatedRecord(BaseModel):
@@ -31,9 +92,18 @@ class QuarantineRecord(BaseModel):
 class Validator:
     """Validates records and separates clean data from quarantined anomalies."""
 
-    def __init__(self, run_id: str, source_file: str):
+    def __init__(
+        self,
+        run_id: str,
+        source_file: str,
+        schema_registry: Optional[SchemaRegistry] = None,
+        fk_lookup_provider: Optional[Any] = None,
+    ):
         self.run_id = run_id
         self.source_file = source_file
+        self.schema_registry = schema_registry or SchemaRegistry()
+        self.fk_lookup_provider = fk_lookup_provider
+        self.detected_drifts: List[Dict[str, Any]] = []
 
     def _generate_quarantine_id(self, raw_payload: str, error_code: str) -> str:
         """
@@ -159,6 +229,24 @@ class Validator:
                     run_id=self.run_id,
                     created_at=now_iso,
                 )
+            # Priority 4: Optional parent-table lookup validation
+            if self.fk_lookup_provider and acc_id != "":
+                exists = True
+                try:
+                    exists = self.fk_lookup_provider("accounts", acc_id)
+                except Exception as exc:
+                    logger.warning(f"FK lookup provider check failed with error: {exc}")
+                    exists = True
+                if not exists:
+                    return None, QuarantineRecord(
+                        quarantine_id=self._generate_quarantine_id(raw_str, "FOREIGN_KEY_NOT_FOUND"),
+                        source_file=self.source_file,
+                        raw_payload=raw_str,
+                        error_code="FOREIGN_KEY_NOT_FOUND",
+                        error_message=f"Referenced foreign key 'account_id' '{acc_id}' does not exist in parent table",
+                        run_id=self.run_id,
+                        created_at=now_iso,
+                    )
 
         # Negative amount check for financial / transaction events
         if "amount" in parsed_data and parsed_data["amount"] is not None:
@@ -196,6 +284,17 @@ class Validator:
         clean_payload["updated_at"] = normalized_ts
         clean_payload["operation_type"] = op_type
         clean_payload["entity_type"] = entity_type
+
+        # Priority 1: Schema Drift Detection (logs SCHEMA_DRIFT_DETECTED, preserves clean record)
+        if self.schema_registry:
+            drifts = self.schema_registry.detect_drift(entity_type, clean_payload)
+            if drifts:
+                for d in drifts:
+                    self.detected_drifts.append(d)
+                    logger.warning(
+                        f"SCHEMA_DRIFT_DETECTED: Entity {entity_type} key '{natural_key_str}' "
+                        f"field '{d['field']}' ({d['drift_type']}): observed {d['observed_type']}"
+                    )
 
         return ValidatedRecord(
             natural_key=natural_key_str,

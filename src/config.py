@@ -26,6 +26,7 @@ DB_PATH = Path(os.getenv("INGESTION_DB_PATH", str(DEFAULT_DB_PATH)))
 DEFAULT_BATCH_SIZE = int(os.getenv("DEFAULT_BATCH_SIZE", "5000"))
 DEFAULT_LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 DEFAULT_SEED = int(os.getenv("RANDOM_SEED", "42"))
+DEFAULT_LOOKBACK_HOURS = int(os.getenv("LOOKBACK_HOURS", "168"))  # 7-day incremental lookback window
 
 # Ensure mandatory directories exist
 for path in [SOURCE_DATA_DIR, GENERATED_DATA_DIR, PROCESSED_DIR, REPORTS_DIR, DATABASE_DIR]:

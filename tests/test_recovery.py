@@ -73,3 +73,47 @@ def test_stalled_run_recovery(temp_db_path):
     assert row[0] == "FAILED_ABORTED"
     assert "Recovered on restart" in row[1]
     conn.close()
+
+
+def test_dlq_replay_with_corrected_payload(runner, create_test_file, temp_db_path):
+    """Verifies that an invalid record in quarantine can be safely replayed using corrected payload."""
+    # 1. Ingest record with missing natural key -> routed to quarantine
+    bad_record = [{"natural_key": None, "name": "Broken User", "updated_at": "2026-11-01T10:00:00Z"}]
+    res = runner.run(create_test_file(bad_record, "bad_input.json"))
+    assert res["quarantined_count"] == 1
+
+    conn = sqlite3.connect(str(temp_db_path))
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT quarantine_id, replayed FROM quarantine")
+    q_row = cursor.fetchone()
+    q_id = q_row["quarantine_id"]
+    assert q_row["replayed"] == 0
+
+    # 2. Replay with corrected payload
+    corrected = {
+        "natural_key": "CUST_FIXED_1",
+        "name": "Fixed User",
+        "updated_at": "2026-11-01T10:00:00Z",
+        "operation_type": "INSERT",
+        "amount": 250.0,
+    }
+    replay_res = RecoveryManager.replay_quarantine_record(conn, q_id, corrected_payload=corrected)
+    assert replay_res["status"] == "SUCCESS"
+    assert replay_res["inserted_count"] == 1
+
+    # 3. Verify quarantine row is marked replayed
+    cursor.execute("SELECT replayed FROM quarantine WHERE quarantine_id = ?", (q_id,))
+    assert cursor.fetchone()["replayed"] == 1
+
+    # 4. Verify record now exists in target_records
+    cursor.execute("SELECT * FROM target_records WHERE natural_key = 'CUST_FIXED_1'")
+    target = cursor.fetchone()
+    assert target is not None
+    assert "Fixed User" in target["payload"]
+
+    # 5. Idempotent re-replay should return ALREADY_REPLAYED
+    second_replay = RecoveryManager.replay_quarantine_record(conn, q_id, corrected_payload=corrected)
+    assert second_replay["status"] == "ALREADY_REPLAYED"
+
+    conn.close()

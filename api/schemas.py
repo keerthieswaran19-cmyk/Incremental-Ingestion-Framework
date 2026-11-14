@@ -50,3 +50,8 @@ class WatermarkItem(BaseModel):
     high_watermark: str
     updated_at: str
     last_run_id: str
+
+
+class DLQReplayRequest(BaseModel):
+    """Payload for replaying a quarantined DLQ record."""
+    corrected_payload: Optional[Dict[str, Any]] = Field(default=None, description="Optional corrected JSON payload")

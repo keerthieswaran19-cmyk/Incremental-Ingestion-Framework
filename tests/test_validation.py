@@ -103,3 +103,59 @@ def test_dlq_idempotency_across_runs(runner, create_test_file, temp_db_path):
     assert row["run_id"] == run2["run_id"]
     conn.close()
 
+
+def test_schema_drift_detection(runner, create_test_file, temp_db_path, caplog):
+    """Verifies that unexpected fields or mutated datatypes trigger SCHEMA_DRIFT_DETECTED without halting ingestion."""
+    import logging
+    records = [
+        {
+            "natural_key": "CUST_DRIFT_1",
+            "name": "Drifted User",
+            "updated_at": "2026-11-01T10:00:00Z",
+            "operation_type": "INSERT",
+            "novel_feature_field": "SURPRISE_METRIC_VALUE",  # Unexpected new field
+            "custom_metadata_tag": 12345,                    # Another drifted attribute
+        }
+    ]
+    file_path = create_test_file(records, "drift_batch.json")
+    with caplog.at_level(logging.WARNING):
+        res = runner.run(file_path)
+
+    # Ingestion should succeed and preserve the record
+    assert res["status"] == "SUCCESS"
+    assert res["inserted_count"] == 1
+    assert res["quarantined_count"] == 0
+
+    # Log should contain SCHEMA_DRIFT_DETECTED warnings
+    assert any("SCHEMA_DRIFT_DETECTED" in rec.message for rec in caplog.records)
+
+
+def test_foreign_key_parent_table_lookup(create_test_file, temp_db_path):
+    """Verifies that optional parent table lookup routes invalid foreign keys to quarantine."""
+    from src.validator import Validator
+    from src.pipeline import PipelineRunner
+
+    # Mock foreign key provider: only ACC-1001 exists in parent table
+    valid_accounts = {"ACC-1001", "ACC-1002"}
+    def mock_fk_provider(table_name, key_val):
+        return key_val in valid_accounts
+
+    validator = Validator(
+        run_id="TEST_RUN",
+        source_file="fk_test.json",
+        fk_lookup_provider=mock_fk_provider,
+    )
+
+    # 1. Valid foreign key that exists
+    valid_raw = '{"natural_key": "CUST_1", "updated_at": "2026-11-01T10:00:00Z", "account_id": "ACC-1001"}'
+    v_rec, q_rec = validator.validate_record(valid_raw, {"natural_key": "CUST_1", "updated_at": "2026-11-01T10:00:00Z", "account_id": "ACC-1001"})
+    assert v_rec is not None
+    assert q_rec is None
+
+    # 2. Well-formatted ACC-* key that DOES NOT exist in parent table
+    missing_raw = '{"natural_key": "CUST_2", "updated_at": "2026-11-01T10:00:00Z", "account_id": "ACC-9999"}'
+    v_rec2, q_rec2 = validator.validate_record(missing_raw, {"natural_key": "CUST_2", "updated_at": "2026-11-01T10:00:00Z", "account_id": "ACC-9999"})
+    assert v_rec2 is None
+    assert q_rec2 is not None
+    assert q_rec2.error_code == "FOREIGN_KEY_NOT_FOUND"
+

@@ -2,11 +2,11 @@
 
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.config import DB_PATH, DEFAULT_BATCH_SIZE
+from src.config import DB_PATH, DEFAULT_BATCH_SIZE, DEFAULT_LOOKBACK_HOURS
 from src.database import get_connection, transaction_scope
 from src.extractor import Extractor
 from src.logger import setup_logger
@@ -38,6 +38,7 @@ class PipelineRunner:
         entity_name: str = "CUSTOMER",
         force_reprocess: bool = False,
         incremental: bool = True,
+        lookback_hours: Optional[int] = DEFAULT_LOOKBACK_HOURS,
     ) -> Dict[str, Any]:
         """
         Executes complete ingestion for a given source file.
@@ -108,6 +109,16 @@ class PipelineRunner:
             total_input_count = 0
             watermark_skipped_count = 0
 
+            # Priority 2: Compute lookback window threshold so late-arriving records reach Loader
+            watermark_threshold = current_watermark
+            if incremental and lookback_hours and lookback_hours > 0 and current_watermark != WatermarkManager.DEFAULT_WATERMARK:
+                try:
+                    wm_clean = current_watermark.replace("Z", "+00:00")
+                    wm_dt = datetime.fromisoformat(wm_clean)
+                    watermark_threshold = (wm_dt - timedelta(hours=lookback_hours)).isoformat()
+                except Exception:
+                    watermark_threshold = current_watermark
+
             for idx, raw_str, parsed_item in extractor.stream_records():
                 total_input_count += 1
                 valid_rec, quar_rec = validator.validate_record(raw_str, parsed_item)
@@ -123,9 +134,8 @@ class PipelineRunner:
                         run_id,
                     ))
                 elif valid_rec:
-                    # Incremental filter check
-                    if incremental and valid_rec.updated_at <= current_watermark:
-                        # Record is older than or equal to current high-watermark; count as duplicate / processed
+                    # Incremental filter check (uses lookback window to allow late arrivals through)
+                    if incremental and valid_rec.updated_at <= watermark_threshold:
                         watermark_skipped_count += 1
                     else:
                         validated_records.append(valid_rec)
@@ -178,8 +188,13 @@ class PipelineRunner:
                     source_file=source_path.name,
                 )
 
-                # Total duplicate count = in-batch duplicates + cross-batch payload duplicates + watermark skipped
-                total_duplicates = in_batch_duplicates + load_metrics.duplicate_count + watermark_skipped_count
+                # Total duplicate count = in-batch duplicates + cross-batch payload duplicates + watermark skipped + late-arriving non-mutations
+                total_duplicates = (
+                    in_batch_duplicates
+                    + load_metrics.duplicate_count
+                    + watermark_skipped_count
+                    + load_metrics.late_arriving_count
+                )
 
                 # D. Advance high watermark if new records were processed
                 if new_high_watermark > current_watermark:

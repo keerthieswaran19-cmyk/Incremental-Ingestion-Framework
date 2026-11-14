@@ -2,7 +2,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![SQLite WAL](https://img.shields.io/badge/database-SQLite%20WAL-success.svg)](https://www.sqlite.org/wal.html)
-[![Tests Passing](https://img.shields.io/badge/pytest-16%20passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests Passing](https://img.shields.io/badge/pytest-21%20passed%20(100%25)-brightgreen.svg)](tests/)
 [![FastAPI Cockpit](https://img.shields.io/badge/UI-Operations%20Cockpit-cyan.svg)](ui/)
 [![Reconciliation](https://img.shields.io/badge/reconciliation-100%25%20Balanced-emerald.svg)](reports/)
 
