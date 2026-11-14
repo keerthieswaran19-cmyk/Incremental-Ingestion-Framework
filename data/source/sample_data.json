@@ -85,8 +85,8 @@
     "amount": 817.46
   },
   {
-    "natural_key": "CUST_000022",
-    "name": "Tombstone for CUST_000022",
+    "natural_key": "CUST_000025",
+    "name": "Tombstone for CUST_000025",
     "updated_at": "2026-11-01T00:05:45+00:00",
     "operation_type": "DELETE",
     "account_id": "ACC-7572",
@@ -134,8 +134,8 @@
     "amount": 636.02
   },
   {
-    "natural_key": "CUST_000005",
-    "name": "Late Arriving Update for CUST_000005",
+    "natural_key": "CUST_000014",
+    "name": "Late Arriving Update for CUST_000014",
     "updated_at": "2026-10-26T22:09:23+00:00",
     "operation_type": "UPDATE",
     "account_id": "ACC-9797",
@@ -349,8 +349,8 @@
     "amount": 763.27
   },
   {
-    "natural_key": "CUST_000014",
-    "name": "Late Arriving Update for CUST_000014",
+    "natural_key": "CUST_000019",
+    "name": "Late Arriving Update for CUST_000019",
     "updated_at": "2026-10-26T15:21:24+00:00",
     "operation_type": "UPDATE",
     "account_id": "ACC-5905",
@@ -380,8 +380,8 @@
     "amount": 1589.37
   },
   {
-    "natural_key": "CUST_000009",
-    "name": "Late Arriving Update for CUST_000009",
+    "natural_key": "CUST_000041",
+    "name": "Late Arriving Update for CUST_000041",
     "updated_at": "2026-10-26T21:22:59+00:00",
     "operation_type": "UPDATE",
     "account_id": "ACC-5291",
@@ -389,8 +389,8 @@
     "is_late": true
   },
   {
-    "natural_key": "CUST_000049",
-    "name": "Tombstone for CUST_000049",
+    "natural_key": "CUST_000035",
+    "name": "Tombstone for CUST_000035",
     "updated_at": "2026-11-01T00:23:32+00:00",
     "operation_type": "DELETE",
     "account_id": "ACC-3442",
@@ -449,8 +449,8 @@
     "amount": 2053.14
   },
   {
-    "natural_key": "CUST_000008",
-    "name": "Late Arriving Update for CUST_000008",
+    "natural_key": "CUST_000050",
+    "name": "Late Arriving Update for CUST_000050",
     "updated_at": "2026-10-26T17:27:56+00:00",
     "operation_type": "UPDATE",
     "account_id": "ACC-6378",
@@ -547,8 +547,8 @@
     "amount": 782.94
   },
   {
-    "natural_key": "CUST_000010",
-    "name": "Late Arriving Update for CUST_000010",
+    "natural_key": "CUST_000051",
+    "name": "Late Arriving Update for CUST_000051",
     "updated_at": "2026-10-26T16:34:02+00:00",
     "operation_type": "UPDATE",
     "account_id": "ACC-2193",
@@ -666,16 +666,16 @@
     "amount": 2268.25
   },
   {
-    "natural_key": "CUST_000015",
-    "name": "Tombstone for CUST_000015",
+    "natural_key": "CUST_000026",
+    "name": "Tombstone for CUST_000026",
     "updated_at": "2026-11-01T00:40:46+00:00",
     "operation_type": "DELETE",
     "account_id": "ACC-3223",
     "amount": 0.0
   },
   {
-    "natural_key": "CUST_000059",
-    "name": "Tombstone for CUST_000059",
+    "natural_key": "CUST_000033",
+    "name": "Tombstone for CUST_000033",
     "updated_at": "2026-11-01T00:41:46+00:00",
     "operation_type": "DELETE",
     "account_id": "ACC-6363",

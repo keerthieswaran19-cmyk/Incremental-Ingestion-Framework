@@ -1,4 +1,4 @@
-// IngestOps Enterprise Operations Cockpit Frontend Controller
+// IngestOps Cloud & Sage Enterprise Operations Cockpit Controller
 
 let currentView = 'overview';
 let cachedRuns = [];
@@ -9,7 +9,45 @@ let currentEventTab = 'target';
 let throughputChartInstance = null;
 let splitChartInstance = null;
 
-// Generic Fetch Wrapper
+// ==========================================================================
+// THEME SWITCHER LOGIC (LIGHT / DARK)
+// ==========================================================================
+
+function getActiveTheme() {
+  return document.documentElement.getAttribute('data-theme') || 'light';
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try {
+    localStorage.setItem('ingestops_theme', theme);
+  } catch (e) {}
+
+  // Update theme toggle icon
+  const icon = document.getElementById('theme-icon');
+  if (icon) {
+    if (theme === 'dark') {
+      icon.setAttribute('data-lucide', 'sun');
+    } else {
+      icon.setAttribute('data-lucide', 'moon');
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  // Re-render telemetry charts to match theme palette
+  renderCharts();
+}
+
+function toggleTheme() {
+  const current = getActiveTheme();
+  const next = current === 'light' ? 'dark' : 'light';
+  setTheme(next);
+}
+
+// ==========================================================================
+// API CLIENT
+// ==========================================================================
+
 async function apiGet(endpoint) {
   try {
     const res = await fetch(endpoint);
@@ -36,13 +74,16 @@ async function apiPost(endpoint, body) {
   }
 }
 
-// Navigation View Router
+// ==========================================================================
+// ROUTER & VIEW NAVIGATION
+// ==========================================================================
+
 function navigate(viewName) {
   currentView = viewName;
 
   // Update sidebar active link
-  document.querySelectorAll('.nav-item').forEach(item => {
-    const text = item.querySelector('span')?.innerText.toLowerCase() || '';
+  document.querySelectorAll('.nav-link').forEach(link => {
+    const text = link.querySelector('span')?.innerText.toLowerCase() || '';
     const match = 
       (viewName === 'overview' && text.includes('overview')) ||
       (viewName === 'executions' && text.includes('execution')) ||
@@ -51,17 +92,17 @@ function navigate(viewName) {
       (viewName === 'reconciliation' && text.includes('conservation')) ||
       (viewName === 'watermarks' && text.includes('watermark')) ||
       (viewName === 'health' && text.includes('system'));
-    item.classList.toggle('active', match);
+    link.classList.toggle('active', match);
   });
 
-  // Update panels
-  document.querySelectorAll('.view-panel').forEach(panel => {
-    panel.classList.toggle('active', panel.id === `view-${viewName}`);
+  // Switch visible section
+  document.querySelectorAll('.view-section').forEach(sec => {
+    sec.classList.toggle('active', sec.id === `view-${viewName}`);
   });
 
-  // Update breadcrumb
+  // Update header breadcrumb
   const titles = {
-    overview: 'Operations Overview',
+    overview: 'Overview',
     executions: 'Pipeline Executions',
     events: 'Event Explorer',
     quarantine: 'Dead-Letter Queue (DLQ)',
@@ -89,7 +130,10 @@ function refreshCurrentView() {
   });
 }
 
-// Master Data Loader
+// ==========================================================================
+// MASTER DATA LOADER
+// ==========================================================================
+
 async function loadAllData() {
   const [overview, runs, dlq, watermarks] = await Promise.all([
     apiGet('/api/overview'),
@@ -119,9 +163,21 @@ async function loadAllData() {
   renderCharts();
 }
 
-// Render Charts
+// ==========================================================================
+// TELEMETRY CHARTS
+// ==========================================================================
+
 function renderCharts() {
   if (typeof Chart === 'undefined') return;
+
+  const isDark = getActiveTheme() === 'dark';
+  const gridColor = isDark ? 'rgba(237, 243, 239, 0.08)' : 'rgba(38, 52, 49, 0.07)';
+  const textColor = isDark ? '#82968A' : '#697B73';
+  const lineColor = isDark ? '#55A88B' : '#267C69';
+  const fillColor = isDark ? 'rgba(85, 168, 139, 0.16)' : 'rgba(38, 124, 105, 0.12)';
+  const tooltipBg = isDark ? '#192722' : '#FFFFFF';
+  const tooltipText = isDark ? '#EDF3EF' : '#263431';
+  const tooltipBorder = isDark ? '#34473D' : '#DFE8E2';
 
   const validRuns = [...cachedRuns].filter(r => r.status === 'SUCCESS').slice(0, 10).reverse();
   const labels = validRuns.map((r, i) => `Run #${i + 1}`);
@@ -138,13 +194,13 @@ function renderCharts() {
         datasets: [{
           label: 'Throughput (records/sec)',
           data: speeds.length ? speeds : [0],
-          borderColor: '#38bdf8',
-          backgroundColor: 'rgba(56, 189, 248, 0.08)',
+          borderColor: lineColor,
+          backgroundColor: fillColor,
           fill: true,
           tension: 0.35,
           borderWidth: 2,
           pointRadius: 4,
-          pointBackgroundColor: '#38bdf8',
+          pointBackgroundColor: lineColor,
         }]
       },
       options: {
@@ -153,21 +209,22 @@ function renderCharts() {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#0d121c',
-            titleColor: '#fff',
-            bodyColor: '#94a3b8',
-            borderColor: '#1e293b',
+            backgroundColor: tooltipBg,
+            titleColor: tooltipText,
+            bodyColor: textColor,
+            borderColor: tooltipBorder,
             borderWidth: 1,
+            padding: 10,
           }
         },
         scales: {
           x: {
-            grid: { color: 'rgba(255, 255, 255, 0.04)' },
-            ticks: { color: '#64748b', font: { size: 10 } }
+            grid: { color: gridColor },
+            ticks: { color: textColor, font: { size: 11, family: 'Inter' } }
           },
           y: {
-            grid: { color: 'rgba(255, 255, 255, 0.04)' },
-            ticks: { color: '#64748b', font: { size: 10 } }
+            grid: { color: gridColor },
+            ticks: { color: textColor, font: { size: 11, family: 'Inter' } }
           }
         }
       }
@@ -183,6 +240,10 @@ function renderCharts() {
     totalDLQ += r.quarantined_count || 0;
   });
 
+  const donutColors = isDark 
+    ? ['#4DBB87', '#55A88B', '#E0B36B', '#E7838C']
+    : ['#23845D', '#267C69', '#B77932', '#BC5260'];
+
   const splitCanvas = document.getElementById('chart-split');
   if (splitCanvas) {
     if (splitChartInstance) splitChartInstance.destroy();
@@ -194,7 +255,7 @@ function renderCharts() {
           data: (totalInserts + totalUpdates + totalDeletes + totalDLQ > 0)
             ? [totalInserts, totalUpdates, totalDeletes, totalDLQ]
             : [1, 0, 0, 0],
-          backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'],
+          backgroundColor: donutColors,
           borderWidth: 0,
         }]
       },
@@ -204,7 +265,14 @@ function renderCharts() {
         plugins: {
           legend: {
             position: 'right',
-            labels: { color: '#94a3b8', boxWidth: 10, font: { size: 11 } }
+            labels: { color: textColor, boxWidth: 12, font: { size: 11.5, family: 'Inter' } }
+          },
+          tooltip: {
+            backgroundColor: tooltipBg,
+            titleColor: tooltipText,
+            bodyColor: textColor,
+            borderColor: tooltipBorder,
+            borderWidth: 1,
           }
         },
         cutout: '72%'
@@ -213,38 +281,42 @@ function renderCharts() {
   }
 }
 
-// 1. Overview Renderer
+// ==========================================================================
+// VIEW RENDERERS
+// ==========================================================================
+
+// 1. Overview
 function renderOverview() {
   const tbody = document.getElementById('overview-runs-body');
   if (!tbody) return;
 
   const slice = cachedRuns.slice(0, 5);
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="10" class="empty-state">No pipeline runs recorded yet. Click "Ingest" above to trigger a run.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-placeholder">No pipeline executions recorded. Click "Ingest" above to trigger a run.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = slice.map(r => `
     <tr>
-      <td><code class="mono">${r.run_id}</code></td>
+      <td><code class="hash-code">${r.run_id}</code></td>
       <td>${r.start_time ? r.start_time.substring(0, 19).replace('T', ' ') : '--'}</td>
-      <td>${getStatusTag(r.status)}</td>
+      <td>${getStatusBadge(r.status)}</td>
       <td><strong>${(r.input_count || 0).toLocaleString()}</strong></td>
-      <td style="color: #34d399; font-weight: 600;">+${(r.inserted_count || 0).toLocaleString()}</td>
-      <td style="color: #60a5fa;">${(r.updated_count || 0).toLocaleString()}</td>
-      <td style="color: #fbbf24;">-${(r.deleted_count || 0).toLocaleString()}</td>
-      <td style="color: #f87171;">${(r.quarantined_count || 0).toLocaleString()}</td>
+      <td style="color: var(--color-success); font-weight: 600;">+${(r.inserted_count || 0).toLocaleString()}</td>
+      <td style="color: var(--accent-primary);">${(r.updated_count || 0).toLocaleString()}</td>
+      <td style="color: var(--color-warning);">-${(r.deleted_count || 0).toLocaleString()}</td>
+      <td style="color: var(--color-error);">${(r.quarantined_count || 0).toLocaleString()}</td>
       <td>${r.duration_ms ? r.duration_ms.toFixed(1) + 'ms' : '--'}</td>
       <td>${r.records_per_sec ? r.records_per_sec.toFixed(0) + ' r/s' : '--'}</td>
     </tr>
   `).join('');
 }
 
-// 2. Executions Renderer
+// 2. Executions
 let execFilter = 'ALL';
 function setExecFilter(filter, el) {
   execFilter = filter;
-  document.querySelectorAll('#view-executions .filter-chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('#view-executions .filter-btn').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderExecutions();
 }
@@ -267,21 +339,21 @@ function renderExecutions() {
   });
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="12" class="empty-state">No execution runs matching current filter.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="empty-placeholder">No execution runs matching current filter.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtered.map(r => `
     <tr>
-      <td><code class="mono">${r.run_id}</code></td>
+      <td><code class="hash-code">${r.run_id}</code></td>
       <td>${r.start_time ? r.start_time.substring(0, 19).replace('T', ' ') : '--'}</td>
-      <td>${getStatusTag(r.status)}</td>
+      <td>${getStatusBadge(r.status)}</td>
       <td><strong>${(r.input_count || 0).toLocaleString()}</strong></td>
-      <td style="color: #34d399; font-weight: 600;">+${r.inserted_count || 0}</td>
-      <td style="color: #60a5fa;">${r.updated_count || 0}</td>
-      <td style="color: #fbbf24;">-${r.deleted_count || 0}</td>
-      <td style="color: #f87171;">${r.quarantined_count || 0}</td>
-      <td style="color: #94a3b8;">${r.duplicate_count || 0}</td>
+      <td style="color: var(--color-success); font-weight: 600;">+${r.inserted_count || 0}</td>
+      <td style="color: var(--accent-primary);">${r.updated_count || 0}</td>
+      <td style="color: var(--color-warning);">-${r.deleted_count || 0}</td>
+      <td style="color: var(--color-error);">${r.quarantined_count || 0}</td>
+      <td style="color: var(--text-muted);">${r.duplicate_count || 0}</td>
       <td>${r.duration_ms ? r.duration_ms.toFixed(1) + 'ms' : '--'}</td>
       <td>${r.records_per_sec ? r.records_per_sec.toFixed(0) + ' r/s' : '--'}</td>
       <td>
@@ -291,7 +363,7 @@ function renderExecutions() {
   `).join('');
 }
 
-// 3. Event Explorer Renderer
+// 3. Event Explorer
 function switchEventTab(tab) {
   currentEventTab = tab;
   document.getElementById('chip-target-tab').classList.toggle('active', tab === 'target');
@@ -320,23 +392,23 @@ async function renderEvents() {
         <th>Payload Action</th>
       </tr>
     `;
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Querying active target records...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-placeholder">Querying active target entities...</td></tr>`;
     
     const url = search ? `/api/target-records?search=${encodeURIComponent(search)}` : '/api/target-records?limit=50';
     const targets = await apiGet(url);
     cachedTargets = targets || [];
 
     if (!cachedTargets.length) {
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No target records found.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-placeholder">No target records found.</td></tr>`;
       return;
     }
 
     tbody.innerHTML = cachedTargets.map(t => `
       <tr>
         <td><strong>${t.natural_key}</strong></td>
-        <td><span class="status-tag status-info">${t.entity_type}</span></td>
-        <td><code class="mono">v${t.version}</code></td>
-        <td>${t.is_deleted ? '<span class="status-tag status-danger">TOMBSTONED</span>' : '<span class="status-tag status-success">ACTIVE</span>'}</td>
+        <td><span class="badge badge-info">${t.entity_type}</span></td>
+        <td><code class="hash-code">v${t.version}</code></td>
+        <td>${t.is_deleted ? '<span class="badge badge-error">TOMBSTONED</span>' : '<span class="badge badge-success">ACTIVE</span>'}</td>
         <td>${t.first_seen_at ? t.first_seen_at.substring(0, 19).replace('T', ' ') : '--'}</td>
         <td>${t.last_updated_at ? t.last_updated_at.substring(0, 19).replace('T', ' ') : '--'}</td>
         <td>
@@ -357,25 +429,25 @@ async function renderEvents() {
         <th>Payload Action</th>
       </tr>
     `;
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Querying CDC event history...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-placeholder">Querying CDC mutations ledger...</td></tr>`;
 
     const url = search ? `/api/events?natural_key=${encodeURIComponent(search)}` : '/api/events?limit=50';
     const history = await apiGet(url);
     cachedHistory = history || [];
 
     if (!cachedHistory.length) {
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No event mutations found.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-placeholder">No event mutations found.</td></tr>`;
       return;
     }
 
     tbody.innerHTML = cachedHistory.map(h => `
       <tr>
-        <td><code class="mono">${h.history_id.substring(0, 10)}...</code></td>
+        <td><code class="hash-code">${h.history_id.substring(0, 10)}...</code></td>
         <td><strong>${h.natural_key}</strong></td>
-        <td><span class="status-tag ${h.operation_type === 'INSERT' ? 'status-success' : h.operation_type === 'UPDATE' ? 'status-info' : 'status-danger'}">${h.operation_type}</span></td>
-        <td>${h.is_out_of_order ? '<span class="status-tag status-warning">LATE ARRIVAL</span>' : '<span class="status-tag status-success">IN-ORDER</span>'}</td>
+        <td><span class="badge ${h.operation_type === 'INSERT' ? 'badge-success' : h.operation_type === 'UPDATE' ? 'badge-info' : 'badge-error'}">${h.operation_type}</span></td>
+        <td>${h.is_out_of_order ? '<span class="badge badge-warning">LATE ARRIVAL</span>' : '<span class="badge badge-success">IN-ORDER</span>'}</td>
         <td>${h.event_timestamp ? h.event_timestamp.substring(0, 19).replace('T', ' ') : '--'}</td>
-        <td><code class="mono">${h.run_id}</code></td>
+        <td><code class="hash-code">${h.run_id}</code></td>
         <td>
           <button class="btn btn-secondary btn-sm" onclick='inspectRecord("CDC Event: ${h.natural_key}", "Operation: ${h.operation_type}", ${JSON.stringify(h.payload)})'>View JSON</button>
         </td>
@@ -384,11 +456,11 @@ async function renderEvents() {
   }
 }
 
-// 4. Dead-Letter Queue (DLQ) Renderer
+// 4. Dead-Letter Queue
 let dlqFilter = 'ALL';
 function setDLQFilter(filter, el) {
   dlqFilter = filter;
-  document.querySelectorAll('#dlq-filter-chips .filter-chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('#dlq-filter-chips .filter-btn').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderQuarantine();
 }
@@ -410,18 +482,18 @@ function renderQuarantine() {
   });
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color: #34d399;">Dead-Letter Queue Clean! 0 anomalies matching filter.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-placeholder" style="color: var(--color-success);">Dead-Letter Queue Clean! 0 anomalies.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtered.map(q => `
     <tr>
-      <td><code class="mono">${q.quarantine_id.substring(0, 12)}...</code></td>
-      <td><span class="status-tag status-danger">${q.error_code}</span></td>
+      <td><code class="hash-code">${q.quarantine_id.substring(0, 12)}...</code></td>
+      <td><span class="badge badge-error">${q.error_code}</span></td>
       <td>${q.error_message}</td>
-      <td><span class="status-tag status-warning">${q.occurrence_count || 1}x</span></td>
+      <td><span class="badge badge-warning">${q.occurrence_count || 1}x</span></td>
       <td>${q.source_file}</td>
-      <td><code class="mono">${q.run_id}</code></td>
+      <td><code class="hash-code">${q.run_id}</code></td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick='inspectRecord("Quarantined Anomaly: ${q.quarantine_id.substring(0, 8)}", "${q.error_code}: ${q.error_message}", ${JSON.stringify(q.raw_payload)})'>Inspect</button>
       </td>
@@ -429,7 +501,7 @@ function renderQuarantine() {
   `).join('');
 }
 
-// 5. Conservation Proof Renderer
+// 5. Conservation Proof
 async function renderReconciliation() {
   const data = await apiGet('/api/reconciliation');
   const tbody = document.getElementById('reconciliation-tbody');
@@ -437,52 +509,52 @@ async function renderReconciliation() {
 
   const verified = data.recent_runs_reconciliation || [];
   if (!verified.length) {
-    tbody.innerHTML = `<tr><td colspan="10" class="empty-state">No reconciliation audit runs yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-placeholder">No reconciliation audit runs yet.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = verified.map(v => `
     <tr>
-      <td><code class="mono">${v.run_id}</code></td>
+      <td><code class="hash-code">${v.run_id}</code></td>
       <td><strong>${v.metrics.input_count}</strong></td>
-      <td style="color: #34d399;">+${v.metrics.inserted_count}</td>
-      <td style="color: #60a5fa;">${v.metrics.updated_count}</td>
-      <td style="color: #fbbf24;">-${v.metrics.deleted_count}</td>
-      <td style="color: #f87171;">${v.metrics.quarantined_count}</td>
-      <td style="color: #94a3b8;">${v.metrics.duplicate_count}</td>
+      <td style="color: var(--color-success);">+${v.metrics.inserted_count}</td>
+      <td style="color: var(--accent-primary);">${v.metrics.updated_count}</td>
+      <td style="color: var(--color-warning);">-${v.metrics.deleted_count}</td>
+      <td style="color: var(--color-error);">${v.metrics.quarantined_count}</td>
+      <td style="color: var(--text-muted);">${v.metrics.duplicate_count}</td>
       <td>${v.metrics.sum_of_components}</td>
-      <td><strong style="color: ${v.metrics.discrepancy === 0 ? '#34d399' : '#f87171'};">${v.metrics.discrepancy}</strong></td>
+      <td><strong style="color: ${v.metrics.discrepancy === 0 ? 'var(--color-success)' : 'var(--color-error)'};">${v.metrics.discrepancy}</strong></td>
       <td>
         ${v.is_mathematically_sound 
-          ? '<span class="status-tag status-success">✓ 100% BALANCED</span>' 
-          : '<span class="status-tag status-danger">✕ DISCREPANCY</span>'}
+          ? '<span class="badge badge-success">✓ 100% BALANCED</span>' 
+          : '<span class="badge badge-error">✕ DISCREPANCY</span>'}
       </td>
     </tr>
   `).join('');
 }
 
-// 6. Watermark Registry Renderer
+// 6. Watermark Registry
 async function renderWatermarks() {
   const watermarks = await apiGet('/api/watermarks');
   const tbody = document.getElementById('watermarks-tbody');
   if (!tbody) return;
 
   if (!watermarks || !watermarks.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No watermarks registered.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-placeholder">No watermarks registered.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = watermarks.map(w => `
     <tr>
-      <td><span class="status-tag status-info">${w.entity_name}</span></td>
-      <td><code class="mono" style="color: #38bdf8; font-size: 13px;">${w.high_watermark}</code></td>
+      <td><span class="badge badge-info">${w.entity_name}</span></td>
+      <td><code class="hash-code" style="color: var(--accent-primary); font-size: 13px;">${w.high_watermark}</code></td>
       <td>${w.updated_at ? w.updated_at.substring(0, 19).replace('T', ' ') : '--'}</td>
-      <td><code class="mono">${w.last_run_id}</code></td>
+      <td><code class="hash-code">${w.last_run_id}</code></td>
     </tr>
   `).join('');
 }
 
-// 7. System Health Renderer
+// 7. System Health
 async function renderHealth() {
   const overview = await apiGet('/api/overview');
   const tbody = document.getElementById('health-tables-body');
@@ -500,16 +572,19 @@ async function renderHealth() {
 
   tbody.innerHTML = tables.map(t => `
     <tr>
-      <td><code class="mono" style="color: #38bdf8;">${t.name}</code></td>
+      <td><code class="hash-code" style="color: var(--accent-primary);">${t.name}</code></td>
       <td>${t.desc}</td>
       <td><strong>${(overview.table_counts[t.name] || 0).toLocaleString()}</strong> rows</td>
-      <td><code class="mono">${t.pk}</code></td>
-      <td><span class="status-tag status-info">${t.role}</span></td>
+      <td><code class="hash-code">${t.pk}</code></td>
+      <td><span class="badge badge-info">${t.role}</span></td>
     </tr>
   `).join('');
 }
 
-// Actions
+// ==========================================================================
+// ACTIONS
+// ==========================================================================
+
 async function runIngestion() {
   const btn = document.getElementById('btn-trigger');
   const file = document.getElementById('runner-file-select')?.value;
@@ -517,7 +592,8 @@ async function runIngestion() {
   const inc = document.getElementById('runner-incremental')?.checked;
 
   btn.disabled = true;
-  btn.innerHTML = `<i data-lucide="loader" style="width: 12px; height: 12px; animation: spin 1s linear infinite;"></i> Ingesting...`;
+  btn.innerHTML = `<i data-lucide="loader-2" style="width: 12px; height: 12px; animation: spin 1s linear infinite;"></i> Ingesting...`;
+  if (window.lucide) lucide.createIcons();
 
   const res = await apiPost('/api/ingest', {
     source_file: file,
@@ -561,7 +637,10 @@ async function verifyRunReconciliation(runId) {
   }
 }
 
-// Detail Drawer
+// ==========================================================================
+// FORENSIC DRAWER
+// ==========================================================================
+
 function inspectRecord(title, subtitle, payload) {
   document.getElementById('drawer-title').innerText = title;
   document.getElementById('drawer-subtitle').innerText = subtitle;
@@ -583,18 +662,28 @@ function closeDrawer(event) {
 function copyDrawerJSON() {
   const text = document.getElementById('drawer-json').innerText;
   navigator.clipboard.writeText(text);
-  alert("JSON Payload copied to clipboard!");
+  alert("JSON payload copied to clipboard!");
 }
 
-function getStatusTag(status) {
-  if (status === 'SUCCESS') return `<span class="status-tag status-success">SUCCESS</span>`;
-  if (status === 'FAILED') return `<span class="status-tag status-danger">FAILED</span>`;
-  if (status.includes('SKIPPED')) return `<span class="status-tag status-warning">SKIPPED</span>`;
-  return `<span class="status-tag status-info">${status}</span>`;
+function getStatusBadge(status) {
+  if (status === 'SUCCESS') return `<span class="badge badge-success">SUCCESS</span>`;
+  if (status === 'FAILED') return `<span class="badge badge-error">FAILED</span>`;
+  if (status.includes('SKIPPED')) return `<span class="badge badge-warning">SKIPPED</span>`;
+  return `<span class="badge badge-info">${status}</span>`;
 }
 
-// Initialize on DOM Ready
+// ==========================================================================
+// INITIALIZATION
+// ==========================================================================
+
 document.addEventListener('DOMContentLoaded', () => {
+  // Sync toggle button icon with initial theme
+  const initialTheme = getActiveTheme();
+  const icon = document.getElementById('theme-icon');
+  if (icon && initialTheme === 'dark') {
+    icon.setAttribute('data-lucide', 'sun');
+  }
+
   loadAllData().then(() => {
     navigate('overview');
   });
